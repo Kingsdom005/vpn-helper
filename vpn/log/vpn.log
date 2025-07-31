@@ -1,0 +1,17 @@
+[2025-07-31 16:37:35] VPN status: ALL_PROXY=http://127.0.0.1:7890
+[2025-07-31 16:37:36] VPN status: curl connection succeeded
+[2025-07-31 16:49:32] VPN starting (PID=178703)
+[2025-07-31 16:49:33] VPN proxy ready and working
+[2025-07-31 16:49:36] VPN status: ALL_PROXY=http://127.0.0.1:7890
+[2025-07-31 16:49:37] VPN status: curl connection succeeded
+[2025-07-31 16:49:39] VPN stopped (PID=178703)
+[2025-07-31 16:49:57] VPN starting (PID=178970)
+[2025-07-31 16:50:02] VPN proxy ready and working
+[2025-07-31 16:50:18] VPN stopped (PID=178970)
+[2025-07-31 17:12:09] VPN status: ALL_PROXY not set
+[2025-07-31 17:12:11] VPN status: curl connection failed
+[2025-07-31 17:12:15] VPN starting (PID=188873)
+[2025-07-31 17:12:15] VPN proxy ready and working
+[2025-07-31 17:21:47] VPN status: ALL_PROXY=http://127.0.0.1:7890
+[2025-07-31 17:21:47] VPN status: curl connection succeeded
+[2025-07-31 17:26:24] VPN stopped (PID=188873)

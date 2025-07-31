@@ -1,0 +1,146 @@
+#!/bin/bash
+
+# 检查是否通过 source 调用（防止误执行）
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    echo "Error: Please run this script with source or via the vpn() shell function."
+    return 1
+fi
+
+VPN_ROOT="/test00/vpn"
+CLASH_DIR="$VPN_ROOT/clash"
+CONFIG_FILE="$CLASH_DIR/config.yaml"
+CONFIG_BACKUP_DIR="$VPN_ROOT/configHistory"
+LOG_DIR="$VPN_ROOT/log"
+LOG_FILE="$LOG_DIR/vpn.log"
+PID_FILE="$CLASH_DIR/vpn.pid"
+VPN_BIN="$CLASH_DIR/mihomo"
+PROXY_ENV_FILE="$VPN_ROOT/config/vpn-proxy.env"
+ALL_PROXY_URL="http://127.0.0.1:7890"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+wait_for_proxy_ready() {
+    local timeout=5
+    local interval=0.5
+    local elapsed=0
+    while (( $(echo "$elapsed < $timeout" | bc -l) )); do
+        if curl -s --max-time 1 --proxy "$ALL_PROXY_URL" https://www.google.com > /dev/null 2>&1; then
+            return 0
+        fi
+        sleep "$interval"
+        elapsed=$(echo "$elapsed + $interval" | bc)
+    done
+    return 1
+}
+
+start_vpn() {
+    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "VPN is already running. (PID=$(cat "$PID_FILE"))"
+        log "VPN start skipped: already running"
+        return
+    fi
+    cd "$CLASH_DIR" || exit 1
+    nohup "$VPN_BIN" -d . >> "$LOG_DIR/mihomo_output.log" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo -e "# $PROXY_ENV_FILE\nexport ALL_PROXY=\"$ALL_PROXY_URL\"" > "$PROXY_ENV_FILE"
+    export ALL_PROXY="$ALL_PROXY_URL"
+    log "VPN starting (PID=$(cat "$PID_FILE"))"
+
+    echo "Starting VPN, please wait..."
+    echo "Logs are being saved to: $LOG_DIR/mihomo_output.log"
+    echo -n "Waiting for VPN proxy to be ready"
+
+    if wait_for_proxy_ready; then
+        echo -e "\rWaiting for VPN proxy to be ready... ✅ Ready!"
+        log "VPN proxy ready and working"
+    else
+        echo -e "\rWaiting for VPN proxy to be ready... ❌ Timeout or failure."
+        log "VPN proxy wait timeout"
+    fi
+
+    echo "VPN start process completed."
+}
+
+stop_vpn() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        kill "$PID" 2>/dev/null || true
+        rm -f "$PID_FILE"
+        echo -e "# $PROXY_ENV_FILE\nexport ALL_PROXY=\"\"" > "$PROXY_ENV_FILE"
+        unset ALL_PROXY
+        log "VPN stopped (PID=$PID)"
+        echo "VPN stopped successfully. ALL_PROXY environment variable cleared."
+    else
+        echo "Warning: VPN is not currently running."
+        log "VPN stop attempted but VPN was not running"
+    fi
+}
+
+status_vpn() {
+    echo "====== VPN Status Check ======"
+
+    echo -n "1) Current ALL_PROXY environment variable: "
+    if [[ -z "$ALL_PROXY" ]]; then
+        echo "(not set)"
+        log "VPN status: ALL_PROXY not set"
+    else
+        echo "$ALL_PROXY"
+        log "VPN status: ALL_PROXY=$ALL_PROXY"
+    fi
+
+    if [[ "$ALL_PROXY" == "$ALL_PROXY_URL" ]]; then
+        echo "✓ ALL_PROXY is set correctly."
+    else
+        echo "! ALL_PROXY is not set to $ALL_PROXY_URL — VPN may not be active."
+    fi
+
+    echo "2) Testing network connectivity via VPN proxy..."
+    if curl -v --max-time 2 https://www.google.com 2>&1 | grep -q "Connected to"; then
+        echo "✓ Successfully connected to google.com through VPN proxy."
+        log "VPN status: curl connection succeeded"
+    else
+        echo "✗ Failed to connect to google.com through VPN proxy."
+        log "VPN status: curl connection failed"
+    fi
+
+    echo "=============================="
+}
+
+config_vpn() {
+    local new_config="$1"
+    if [[ ! -f "$new_config" ]]; then
+        echo "Error: Configuration file not found: $new_config"
+        exit 1
+    fi
+    if [[ "$new_config" != *.yaml ]]; then
+        echo "Error: Only .yaml configuration files are supported."
+        exit 1
+    fi
+    if [[ -f "$CONFIG_FILE" ]]; then
+        cp "$CONFIG_FILE" "$CONFIG_BACKUP_DIR/config_$(date +%Y%m%d_%H%M%S).yaml"
+        log "Backed up config file to $CONFIG_BACKUP_DIR"
+    fi
+    cp "$new_config" "$CONFIG_FILE"
+    log "Replaced current config with $new_config"
+    echo "Configuration updated successfully."
+}
+
+case "$1" in
+    start)
+        start_vpn
+        ;;
+    stop)
+        stop_vpn
+        ;;
+    status)
+        status_vpn
+        ;;
+    config)
+        config_vpn "$2"
+        ;;
+    *)
+        echo "Usage: vpn {start|stop|status|config <file.yaml>}"
+        ;;
+esac
