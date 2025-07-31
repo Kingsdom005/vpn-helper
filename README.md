@@ -33,9 +33,12 @@
 ### 1. 安装配置（首次执行）
 
 ```bash
+sudo apt install -y bc
+wget https://github.com/Kingsdom005/vpn-helper/archive/refs/tags/release1.0.tar.gz
 cd [/your/path/to]/vpn
 bash ./set_vpn.sh
 source ~/.bashrc
+chmod 777 [path/to]/vpn/clash/mihomo
 ```
 
 📌 **自动完成以下操作**：
